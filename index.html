@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Line Sheet Creator</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --cream: #F9F6F1;
+    --charcoal: #1C1C1C;
+    --mid: #7A7068;
+    --accent: #C8A97E;
+    --border: #E0DAD2;
+    --white: #FFFFFF;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Montserrat', sans-serif; font-weight: 300; background: #EFEFEB; color: var(--charcoal); min-height: 100vh; }
+
+  .topbar { background: var(--charcoal); color: var(--cream); display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; position: sticky; top: 0; z-index: 100; }
+  .topbar-brand { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; }
+  .topbar-brand span { color: var(--accent); }
+  .topbar-actions { display: flex; gap: 12px; }
+  .btn { font-family: 'Montserrat', sans-serif; font-weight: 400; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; border: none; cursor: pointer; padding: 10px 22px; transition: all .25s; }
+  .btn-outline { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: var(--cream); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-accent { background: var(--accent); color: var(--charcoal); }
+  .btn-accent:hover { background: #b8935c; }
+
+  .app { display: flex; min-height: calc(100vh - 61px); }
+
+  .sidebar { width: 320px; flex-shrink: 0; background: var(--white); border-right: 1px solid var(--border); padding: 28px 24px; overflow-y: auto; }
+  .sidebar-section { margin-bottom: 28px; }
+  .sidebar-section-title { font-family: 'Cormorant Garamond', serif; font-size: 11px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  label { display: block; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--mid); margin-bottom: 5px; margin-top: 12px; }
+  label:first-of-type { margin-top: 0; }
+  input[type="text"], textarea { width: 100%; font-family: 'Montserrat', sans-serif; font-weight: 300; font-size: 12px; border: 1px solid var(--border); background: var(--cream); color: var(--charcoal); padding: 9px 12px; outline: none; transition: border .2s; resize: vertical; }
+  input[type="text"]:focus, textarea:focus { border-color: var(--accent); }
+  textarea { min-height: 60px; }
+
+  .grid-controls { display: flex; gap: 8px; margin-top: 6px; }
+  .grid-btn { flex: 1; padding: 8px 0; font-family: 'Montserrat', sans-serif; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; border: 1px solid var(--border); background: var(--cream); cursor: pointer; transition: all .2s; color: var(--mid); }
+  .grid-btn.active, .grid-btn:hover { background: var(--charcoal); color: var(--white); border-color: var(--charcoal); }
+
+  .export-btn { font-family: 'Montserrat', sans-serif; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; padding: 11px 0; cursor: pointer; border: none; transition: all .25s; width: 100%; display: block; margin-bottom: 8px; }
+  .export-pdf { background: var(--charcoal); color: var(--cream); }
+  .export-pdf:hover { background: #333; }
+  .export-png { background: var(--accent); color: var(--charcoal); }
+  .export-png:hover { background: #b8935c; }
+  .export-jpg { background: var(--white); color: var(--charcoal); border: 1px solid var(--border) !important; }
+  .export-jpg:hover { border-color: var(--charcoal) !important; }
+
+  .canvas-wrap { flex: 1; padding: 40px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; background: #DDDDD8; }
+
+  #linesheet { width: 794px; background: var(--white); box-shadow: 0 8px 40px rgba(0,0,0,0.12); padding: 56px 52px 48px; position: relative; }
+
+  .sheet-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 36px; padding-bottom: 20px; border-bottom: 1.5px solid var(--charcoal); }
+  .sheet-brand-name { font-family: 'Cormorant Garamond', serif; font-size: 40px; font-weight: 700; letter-spacing: 5px; text-transform: uppercase; line-height: 1; }
+  .sheet-season { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--mid); text-align: right; }
+  .sheet-season strong { display: block; font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; color: var(--charcoal); letter-spacing: 2px; margin-bottom: 2px; font-style: normal; }
+
+  .product-grid { display: grid; gap: 20px; }
+  .product-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .product-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .product-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+  .product-card { border: 1px solid var(--border); display: flex; flex-direction: column; background: var(--white); position: relative; }
+  .product-card:hover { border-color: #ccc; }
+
+  .card-img-zone { aspect-ratio: 1/1; background: var(--cream); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; }
+  .card-img-zone:hover { background: #EDE8E0; }
+  .card-img-zone img { width: 100%; height: 100%; object-fit: contain; display: none; }
+  .card-img-zone img.loaded { display: block; }
+  .upload-hint { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--mid); pointer-events: none; }
+  .upload-hint svg { opacity: .5; }
+  .upload-hint span { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; }
+  .img-loaded .upload-hint { display: none; }
+  .edit-overlay { position: absolute; inset: 0; background: rgba(28,28,28,0.5); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .2s; color: #fff; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; }
+  .card-img-zone:hover .edit-overlay { opacity: 1; }
+
+  .card-body { padding: 12px 13px 15px; flex: 1; }
+  .card-product-name { font-family: 'Cormorant Garamond', serif; font-size: 14px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 7px; text-transform: uppercase; line-height: 1.2; color: var(--charcoal); }
+  .card-product-name.empty { color: #ccc; }
+  .card-meta { font-size: 9.5px; line-height: 1.8; color: var(--mid); }
+  .meta-row { display: flex; gap: 4px; }
+  .meta-label { font-weight: 500; color: var(--charcoal); letter-spacing: .3px; font-size: 9px; text-transform: uppercase; }
+  .card-desc { font-size: 9px; color: #999; margin-top: 5px; line-height: 1.6; font-style: italic; }
+  .card-price { font-family: 'Cormorant Garamond', serif; font-size: 16px; font-weight: 600; margin-top: 9px; color: var(--charcoal); }
+  .card-colors-row { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+  .color-dot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.12); flex-shrink: 0; }
+
+  .edit-toggle { position: absolute; top: 6px; right: 6px; background: rgba(28,28,28,0.75); border: none; color: #fff; font-size: 8.5px; letter-spacing: 1px; text-transform: uppercase; padding: 4px 8px; cursor: pointer; opacity: 0; transition: opacity .2s; font-family: 'Montserrat', sans-serif; }
+  .product-card:hover .edit-toggle { opacity: 1; }
+
+  .add-card-wrap { border: 1.5px dashed var(--border); }
+  .add-product-btn { width: 100%; aspect-ratio: 1/1; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--mid); font-family: 'Montserrat', sans-serif; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; transition: all .2s; background: none; border: none; }
+  .add-card-wrap:hover { border-color: var(--accent); }
+  .add-card-wrap:hover .add-product-btn { color: var(--accent); }
+
+  .sheet-footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 8.5px; letter-spacing: 2px; text-transform: uppercase; color: var(--mid); }
+
+  .edit-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
+  .edit-panel.open { display: flex; }
+  .edit-panel-inner { background: #fff; width: 420px; max-height: 90vh; overflow-y: auto; padding: 36px 32px; position: relative; }
+  .edit-panel-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 22px; }
+  .edit-close { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--mid); line-height: 1; }
+  .edit-close:hover { color: var(--charcoal); }
+  .edit-save { margin-top: 20px; width: 100%; padding: 12px; background: var(--charcoal); color: var(--white); font-family: 'Montserrat', sans-serif; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; border: none; cursor: pointer; transition: background .2s; }
+  .edit-save:hover { background: var(--accent); color: var(--charcoal); }
+  .delete-card-btn { margin-top: 8px; width: 100%; padding: 10px; background: none; color: #c0392b; font-family: 'Montserrat', sans-serif; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; border: 1px solid #c0392b; cursor: pointer; transition: all .2s; }
+  .delete-card-btn:hover { background: #c0392b; color: #fff; }
+
+  .color-row-picker { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+  .cp-chip { width: 24px; height: 24px; border-radius: 50%; border: 2.5px solid transparent; cursor: pointer; transition: transform .15s, border .15s; }
+  .cp-chip:hover { transform: scale(1.15); }
+  .cp-chip.sel { border-color: var(--charcoal) !important; }
+  .cp-custom { height: 26px; width: 26px; border: 1px solid var(--border); padding: 2px; cursor: pointer; border-radius: 50%; overflow: hidden; background: none; }
+
+  .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 300; color: #fff; font-family: 'Cormorant Garamond', serif; font-size: 24px; letter-spacing: 4px; text-transform: uppercase; align-items: center; justify-content: center; }
+  .loading-overlay.show { display: flex; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">Line<span>Sheet</span> Studio</div>
+  <div class="topbar-actions">
+    <button class="btn btn-outline" onclick="addProduct()">+ Add Product</button>
+    <button class="btn btn-accent" onclick="exportPDF()">Export PDF</button>
+  </div>
+</div>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Brand Info</div>
+      <label>Brand / Company Name</label>
+      <input type="text" id="sb-brand" value="YOUR BRAND" oninput="syncHeader()">
+      <label>Collection Name</label>
+      <input type="text" id="sb-collection" value="Spring / Summer 2025" oninput="syncHeader()">
+      <label>Season</label>
+      <input type="text" id="sb-season" value="SS25" oninput="syncHeader()">
+      <label>Contact / Website</label>
+      <input type="text" id="sb-contact" value="info@yourbrand.com" oninput="syncFooter()">
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Layout</div>
+      <label>Columns per Row</label>
+      <div class="grid-controls">
+        <button class="grid-btn" onclick="setGrid(2)" id="gb2">2</button>
+        <button class="grid-btn active" onclick="setGrid(3)" id="gb3">3</button>
+        <button class="grid-btn" onclick="setGrid(4)" id="gb4">4</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Export</div>
+      <button class="export-btn export-pdf" onclick="exportPDF()">↓ Download PDF</button>
+      <button class="export-btn export-png" onclick="exportImage('png')">↓ Download PNG</button>
+      <button class="export-btn export-jpg" onclick="exportImage('jpeg')">↓ Download JPG</button>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap">
+    <div id="linesheet">
+      <div class="sheet-header">
+        <div class="sheet-brand-name" id="sh-brand">YOUR BRAND</div>
+        <div class="sheet-season">
+          <strong id="sh-collection">Spring / Summer 2025</strong>
+          <span id="sh-seasonlabel">SS25</span>
+        </div>
+      </div>
+      <div class="product-grid cols-3" id="product-grid"></div>
+      <div class="sheet-footer">
+        <span id="sh-contact">info@yourbrand.com</span>
+        <span>Confidential — Not for Distribution</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT PANEL -->
+<div class="edit-panel" id="editPanel">
+  <div class="edit-panel-inner">
+    <button class="edit-close" onclick="closeEdit()">✕</button>
+    <div class="edit-panel-title">Edit Product</div>
+    <label>Product Name</label>
+    <input type="text" id="ep-name" placeholder="e.g. Silk Blouse">
+    <label>Collection</label>
+    <input type="text" id="ep-collection" placeholder="e.g. Resort 2025">
+    <label>Dimensions / Sizes</label>
+    <input type="text" id="ep-dimensions" placeholder="e.g. XS / S / M / L  or  30 × 45 cm">
+    <label>Price</label>
+    <input type="text" id="ep-price" placeholder="e.g. $240.00">
+    <label>Available Colors</label>
+    <div class="color-row-picker" id="ep-colors"></div>
+    <label>General Description</label>
+    <textarea id="ep-desc" placeholder="Material, care, details…"></textarea>
+    <button class="edit-save" onclick="saveEdit()">Save Product</button>
+    <button class="delete-card-btn" onclick="deleteCard()">Remove Product</button>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">Generating…</div>
+<input type="file" accept="image/*" id="imgUpload" style="display:none" onchange="handleImgUpload(event)">
+
+<script>
+const PRESETS = ['#1C1C1C','#5C4033','#C8A97E','#F2EDE5','#6B8F71','#2C4770','#D4607A','#7C5CBF','#E07B39','#9E9B8E'];
+let products = [];
+let editingId = null;
+let uploadingId = null;
+let selColors = [];
+let gridCols = 3;
+
+function init() {
+  // 3 default cards
+  ['','',''].forEach(() => {
+    const id = uid();
+    products.push({ id, name:'', collection:'', dimensions:'', price:'', colors:[], desc:'', imgSrc:null });
+  });
+  renderGrid();
+}
+
+function uid() { return 'p' + Date.now() + Math.random().toString(36).slice(2,6); }
+
+function syncHeader() {
+  document.getElementById('sh-brand').textContent = document.getElementById('sb-brand').value || 'YOUR BRAND';
+  document.getElementById('sh-collection').textContent = document.getElementById('sb-collection').value;
+  document.getElementById('sh-seasonlabel').textContent = document.getElementById('sb-season').value;
+}
+function syncFooter() {
+  document.getElementById('sh-contact').textContent = document.getElementById('sb-contact').value;
+}
+
+function setGrid(n) {
+  gridCols = n;
+  [2,3,4].forEach(x => document.getElementById('gb'+x).classList.toggle('active', x===n));
+  document.getElementById('product-grid').className = 'product-grid cols-' + n;
+}
+
+function addProduct() {
+  const id = uid();
+  products.push({ id, name:'', collection:'', dimensions:'', price:'', colors:[], desc:'', imgSrc:null });
+  renderGrid();
+  openEdit(id);
+}
+
+function renderGrid() {
+  const grid = document.getElementById('product-grid');
+  grid.innerHTML = '';
+  products.forEach(p => grid.appendChild(buildCard(p)));
+  const addWrap = document.createElement('div');
+  addWrap.className = 'add-card-wrap';
+  addWrap.innerHTML = '<button class="add-product-btn" onclick="addProduct()"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="10" stroke="currentColor" stroke-width="1.2"/><path d="M11 6.5v9M6.5 11h9" stroke="currentColor" stroke-width="1.2"/></svg>Add Product</button>';
+  grid.appendChild(addWrap);
+}
+
+function buildCard(p) {
+  const div = document.createElement('div');
+  div.className = 'product-card';
+  div.id = 'card-' + p.id;
+
+  // image zone
+  const imgZone = document.createElement('div');
+  imgZone.className = 'card-img-zone' + (p.imgSrc ? ' img-loaded' : '');
+  imgZone.onclick = () => triggerUpload(p.id);
+
+  const img = document.createElement('img');
+  if (p.imgSrc) { img.src = p.imgSrc; img.className = 'loaded'; }
+  imgZone.appendChild(img);
+
+  const hint = document.createElement('div');
+  hint.className = 'upload-hint';
+  hint.innerHTML = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none"><rect x="2" y="6" width="22" height="16" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M13 2v10M10 5l3-3 3 3" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="14" r="2" stroke="currentColor" stroke-width="1.1"/><path d="M2 20l5-5 4 4 3-3 4 4" stroke="currentColor" stroke-width="1.1"/></svg><span>Add Photo</span>';
+  imgZone.appendChild(hint);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'edit-overlay';
+  overlay.textContent = 'Change Photo';
+  imgZone.appendChild(overlay);
+
+  div.appendChild(imgZone);
+
+  // body
+  const body = document.createElement('div');
+  body.className = 'card-body';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'card-product-name' + (p.name ? '' : ' empty');
+  nameEl.textContent = p.name || 'Product Name';
+  body.appendChild(nameEl);
+
+  const meta = document.createElement('div');
+  meta.className = 'card-meta';
+
+  if (p.collection) meta.innerHTML += `<div class="meta-row"><span class="meta-label">Collection&nbsp;</span><span>${p.collection}</span></div>`;
+  if (p.dimensions) meta.innerHTML += `<div class="meta-row"><span class="meta-label">Size&nbsp;</span><span>${p.dimensions}</span></div>`;
+  body.appendChild(meta);
+
+  if (p.desc) {
+    const desc = document.createElement('div');
+    desc.className = 'card-desc';
+    desc.textContent = p.desc;
+    body.appendChild(desc);
+  }
+
+  if (p.colors.length) {
+    const cr = document.createElement('div');
+    cr.className = 'card-colors-row';
+    p.colors.forEach(c => {
+      const dot = document.createElement('div');
+      dot.className = 'color-dot';
+      dot.style.background = c;
+      dot.title = c;
+      cr.appendChild(dot);
+    });
+    body.appendChild(cr);
+  }
+
+  if (p.price) {
+    const pr = document.createElement('div');
+    pr.className = 'card-price';
+    pr.textContent = p.price;
+    body.appendChild(pr);
+  }
+
+  div.appendChild(body);
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'edit-toggle';
+  editBtn.textContent = 'Edit';
+  editBtn.onclick = (e) => { e.stopPropagation(); openEdit(p.id); };
+  div.appendChild(editBtn);
+
+  return div;
+}
+
+function triggerUpload(id) {
+  uploadingId = id;
+  const inp = document.getElementById('imgUpload');
+  inp.value = '';
+  inp.click();
+}
+function handleImgUpload(e) {
+  const file = e.target.files[0];
+  if (!file || !uploadingId) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const p = products.find(x => x.id === uploadingId);
+    if (p) { p.imgSrc = ev.target.result; renderGrid(); }
+  };
+  reader.readAsDataURL(file);
+}
+
+function openEdit(id) {
+  editingId = id;
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('ep-name').value = p.name;
+  document.getElementById('ep-collection').value = p.collection;
+  document.getElementById('ep-dimensions').value = p.dimensions;
+  document.getElementById('ep-price').value = p.price;
+  document.getElementById('ep-desc').value = p.desc;
+  selColors = [...p.colors];
+  renderColorPicker();
+  document.getElementById('editPanel').classList.add('open');
+}
+function closeEdit() {
+  document.getElementById('editPanel').classList.remove('open');
+  editingId = null;
+}
+function saveEdit() {
+  if (!editingId) return;
+  const p = products.find(x => x.id === editingId);
+  if (!p) return;
+  p.name = document.getElementById('ep-name').value;
+  p.collection = document.getElementById('ep-collection').value;
+  p.dimensions = document.getElementById('ep-dimensions').value;
+  p.price = document.getElementById('ep-price').value;
+  p.desc = document.getElementById('ep-desc').value;
+  p.colors = [...selColors];
+  renderGrid();
+  closeEdit();
+}
+function deleteCard() {
+  products = products.filter(x => x.id !== editingId);
+  renderGrid();
+  closeEdit();
+}
+
+function renderColorPicker() {
+  const row = document.getElementById('ep-colors');
+  row.innerHTML = '';
+  PRESETS.forEach(c => {
+    const btn = document.createElement('div');
+    btn.className = 'cp-chip' + (selColors.includes(c) ? ' sel' : '');
+    btn.style.background = c;
+    btn.style.borderColor = selColors.includes(c) ? '#1C1C1C' : 'transparent';
+    btn.title = c;
+    btn.onclick = () => {
+      if (selColors.includes(c)) { selColors = selColors.filter(x => x !== c); }
+      else { selColors.push(c); }
+      renderColorPicker();
+    };
+    row.appendChild(btn);
+  });
+  const ci = document.createElement('input');
+  ci.type = 'color';
+  ci.className = 'cp-custom';
+  ci.title = 'Custom color';
+  ci.oninput = e => {
+    if (!selColors.includes(e.target.value)) { selColors.push(e.target.value); renderColorPicker(); }
+  };
+  row.appendChild(ci);
+}
+
+// EXPORT
+async function exportPDF() {
+  showLoading(true);
+  toggleUIElements(true);
+  await delay(120);
+  const el = document.getElementById('linesheet');
+  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+  toggleUIElements(false);
+  const { jsPDF } = window.jspdf;
+  const mmW = 210;
+  const mmH = (canvas.height / canvas.width) * mmW;
+  const pdf = new jsPDF({ orientation: mmH > mmW ? 'p' : 'l', unit: 'mm', format: [mmW, mmH] });
+  pdf.addImage(canvas.toDataURL('image/jpeg', 1), 'JPEG', 0, 0, mmW, mmH);
+  const brand = document.getElementById('sb-brand').value.replace(/\s+/g, '_') || 'linesheet';
+  pdf.save(brand + '_linesheet.pdf');
+  showLoading(false);
+}
+async function exportImage(fmt) {
+  showLoading(true);
+  toggleUIElements(true);
+  await delay(120);
+  const el = document.getElementById('linesheet');
+  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+  toggleUIElements(false);
+  const a = document.createElement('a');
+  a.download = 'linesheet.' + (fmt === 'jpeg' ? 'jpg' : fmt);
+  a.href = canvas.toDataURL('image/' + fmt, 0.96);
+  a.click();
+  showLoading(false);
+}
+function toggleUIElements(hide) {
+  document.querySelectorAll('.edit-toggle, .edit-overlay, .add-card-wrap').forEach(el => {
+    el.style.visibility = hide ? 'hidden' : '';
+  });
+}
+function showLoading(v) {
+  document.getElementById('loadingOverlay').classList.toggle('show', v);
+}
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+init();
+</script>
+</body>
+</html>
